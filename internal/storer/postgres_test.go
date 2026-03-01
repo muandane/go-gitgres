@@ -8,6 +8,7 @@ import (
 	"go-gitgres/internal/db"
 
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/storage"
 )
 
 func TestPostgresStorerRoundtrip(t *testing.T) {
@@ -61,5 +62,130 @@ func TestPostgresStorerRoundtrip(t *testing.T) {
 	}
 	if gotRef.Hash() != hash {
 		t.Errorf("ref hash: got %s", gotRef.Hash())
+	}
+}
+
+func TestPostgresStorer_IterEncodedObjects_HasEncodedObject_EncodedObjectSize(t *testing.T) {
+	ctx := context.Background()
+	pool, err := db.OpenPool(ctx, "")
+	if err != nil {
+		t.Skipf("no DB: %v", err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("DB unreachable: %v", err)
+	}
+
+	s, err := NewPostgresStorer(ctx, pool, "go_storer_iter_test")
+	if err != nil {
+		t.Fatalf("NewPostgresStorer: %v", err)
+	}
+
+	content := []byte("iter test blob")
+	obj := s.NewEncodedObject().(*plumbing.MemoryObject)
+	obj.SetType(plumbing.BlobObject)
+	obj.SetSize(int64(len(content)))
+	obj.Write(content)
+	hash, err := s.SetEncodedObject(obj)
+	if err != nil {
+		t.Fatalf("SetEncodedObject: %v", err)
+	}
+
+	iter, err := s.IterEncodedObjects(plumbing.AnyObject)
+	if err != nil {
+		t.Fatalf("IterEncodedObjects: %v", err)
+	}
+	var count int
+	err = iter.ForEach(func(plumbing.EncodedObject) error { count++; return nil })
+	iter.Close()
+	if err != nil {
+		t.Fatalf("IterEncodedObjects ForEach: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("IterEncodedObjects: count = %d, want 1", count)
+	}
+
+	if err := s.HasEncodedObject(hash); err != nil {
+		t.Errorf("HasEncodedObject: %v", err)
+	}
+	if err := s.HasEncodedObject(plumbing.ZeroHash); err != plumbing.ErrObjectNotFound {
+		t.Errorf("HasEncodedObject(zero): want ErrObjectNotFound, got %v", err)
+	}
+
+	size, err := s.EncodedObjectSize(hash)
+	if err != nil {
+		t.Fatalf("EncodedObjectSize: %v", err)
+	}
+	if size != int64(len(content)) {
+		t.Errorf("EncodedObjectSize: got %d, want %d", size, len(content))
+	}
+}
+
+func TestPostgresStorer_IterReferences_RemoveReference_CheckAndSetReference_Symbolic(t *testing.T) {
+	ctx := context.Background()
+	pool, err := db.OpenPool(ctx, "")
+	if err != nil {
+		t.Skipf("no DB: %v", err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("DB unreachable: %v", err)
+	}
+
+	s, err := NewPostgresStorer(ctx, pool, "go_storer_refs_test")
+	if err != nil {
+		t.Fatalf("NewPostgresStorer: %v", err)
+	}
+
+	content := []byte("ref test")
+	obj := s.NewEncodedObject().(*plumbing.MemoryObject)
+	obj.SetType(plumbing.BlobObject)
+	obj.SetSize(int64(len(content)))
+	obj.Write(content)
+	hash, err := s.SetEncodedObject(obj)
+	if err != nil {
+		t.Fatalf("SetEncodedObject: %v", err)
+	}
+
+	mainRef := plumbing.NewHashReference("refs/heads/main", hash)
+	if err := s.SetReference(mainRef); err != nil {
+		t.Fatalf("SetReference(main): %v", err)
+	}
+	symRef := plumbing.NewSymbolicReference("HEAD", "refs/heads/main")
+	if err := s.SetReference(symRef); err != nil {
+		t.Fatalf("SetReference(HEAD symbolic): %v", err)
+	}
+
+	refIter, err := s.IterReferences()
+	if err != nil {
+		t.Fatalf("IterReferences: %v", err)
+	}
+	var refNames []string
+	err = refIter.ForEach(func(r *plumbing.Reference) error {
+		refNames = append(refNames, string(r.Name()))
+		return nil
+	})
+	refIter.Close()
+	if err != nil {
+		t.Fatalf("IterReferences ForEach: %v", err)
+	}
+	if len(refNames) != 2 {
+		t.Errorf("IterReferences: got %v, want 2 refs", refNames)
+	}
+
+	if err := s.CheckAndSetReference(mainRef, nil); err != nil {
+		t.Errorf("CheckAndSetReference(main, nil): %v", err)
+	}
+	wrongOld := plumbing.NewHashReference("refs/heads/main", plumbing.ZeroHash)
+	if err := s.CheckAndSetReference(mainRef, wrongOld); err != storage.ErrReferenceHasChanged {
+		t.Errorf("CheckAndSetReference with wrong old: want ErrReferenceHasChanged, got %v", err)
+	}
+
+	if err := s.RemoveReference("refs/heads/main"); err != nil {
+		t.Fatalf("RemoveReference: %v", err)
+	}
+	_, err = s.Reference("refs/heads/main")
+	if err != plumbing.ErrReferenceNotFound {
+		t.Errorf("Reference after Remove: want ErrReferenceNotFound, got %v", err)
 	}
 }

@@ -12,12 +12,14 @@ sqlc:
 test:
 	go test ./...
 
-# Test coverage: writes coverage.out, prints summary. View HTML: go tool cover -html=coverage.out
+# Test coverage (unit + DB tests that run when PGCONN is set). Low %% is expected without a DB.
+# Writes coverage.out; view HTML: go tool cover -html=coverage.out
 test-coverage:
 	go test -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -func=coverage.out
 
-# Near-100%% coverage: runs DB tests against Postgres in Docker (requires Docker). Same tests, no skip.
+# Full coverage: integration tests run against Postgres in Docker (requires Docker).
+# Use this for near-100%% coverage; test-coverage reflects only tests that run without a DB.
 test-integration:
 	go test -tags=integration -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -func=coverage.out

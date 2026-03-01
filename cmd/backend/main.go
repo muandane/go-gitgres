@@ -276,9 +276,7 @@ func parsePushLine(line string) (specs []pushSpec) {
 		return nil
 	}
 	rest := strings.TrimSpace(line[5:])
-	if strings.HasPrefix(rest, "+") {
-		rest = rest[1:]
-	}
+	rest = strings.TrimPrefix(rest, "+")
 	before, after, ok := strings.Cut(rest, ":")
 	if !ok {
 		return append(specs, pushSpec{dst: rest})
