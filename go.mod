@@ -1,4 +1,4 @@
-module go-gitgres
+module github.com/muandane/go-gitgres
 
 go 1.26
 

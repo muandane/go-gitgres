@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"go-gitgres/internal/testutil"
+	"github.com/muandane/go-gitgres/internal/testutil"
 )
 
 func TestMain(m *testing.M) {

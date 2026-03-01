@@ -35,6 +35,18 @@ git push pg main
 git clone gitgres::dbname=gitgres_test/myrepo /path/to/clone
 ```
 
+**Connecting to Postgres**
+
+Connection uses a single libpq-style string: pass it as `conninfo` to the CLI or to `db.OpenPool` in code. For a secured Postgres instance, include the options you need in that string (or set `PGCONN`, `PGPASSWORD`, etc.):
+
+- **TLS:** `sslmode=require` (or `verify-full`, `verify-ca`)
+- **User / password:** `user=myuser` and `password=secret`, or set `PGUSER` / `PGPASSWORD`
+- **Host / port:** `host=db.example.com port=5432`
+
+Example with TLS:  
+`./gitgres-backend init "host=db.example.com port=5432 dbname=gitgres user=gitgres sslmode=require" myrepo`  
+Prefer `PGPASSWORD` in the environment instead of putting the password in the string when possible.
+
 ## Tests
 
 ```bash
@@ -68,6 +80,10 @@ pool, _ := db.OpenPool(ctx, "dbname=gitgres_test")
 s, _ := storer.NewPostgresStorer(ctx, pool, "my-repo")
 // s implements storage.Storer for go-git
 ```
+
+## Examples
+
+The [examples](examples/) directory (vulnerability scan and SBOM with Trivy or Syft+Grype) is a **separate Go module** so its dependencies do not affect this project. Run from `examples/`: `go run ./trivy ...` / `go run ./syft-grype ...`. See [examples/README.md](examples/README.md).
 
 ## SQL
 

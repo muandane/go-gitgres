@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 
-	"go-gitgres/examples/common"
+	"github.com/muandane/go-gitgres/pkg/clone"
 )
 
 const defaultGitURL = "https://github.com/nginx/nginx"
@@ -27,7 +27,7 @@ func main() {
 	ctx := context.Background()
 
 	if *url != "" {
-		cleanup, err := common.FetchAndPushToGitgres(ctx, *conn, *repo, *url)
+		cleanup, err := clone.FetchAndPushToGitgres(ctx, *conn, *repo, *url)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "fetch and push: %v\n", err)
 			os.Exit(1)
@@ -35,7 +35,7 @@ func main() {
 		defer cleanup()
 	}
 
-	dir, cleanup, err := common.CloneFromGitgres(ctx, *conn, *repo)
+	dir, cleanup, err := clone.CloneFromGitgres(ctx, *conn, *repo)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "clone from gitgres: %v\n", err)
 		os.Exit(1)

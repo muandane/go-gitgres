@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go-gitgres/internal/db"
-	"go-gitgres/internal/storer"
+	"github.com/muandane/go-gitgres/internal/db"
+	"github.com/muandane/go-gitgres/internal/storer"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"

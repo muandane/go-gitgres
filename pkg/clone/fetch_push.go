@@ -1,11 +1,11 @@
-package common
+package clone
 
 import (
 	"context"
 	"os"
 
-	"go-gitgres/internal/backend"
-	"go-gitgres/internal/storer"
+	"github.com/muandane/go-gitgres/internal/backend"
+	"github.com/muandane/go-gitgres/internal/storer"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
