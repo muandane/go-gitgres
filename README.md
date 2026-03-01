@@ -6,24 +6,23 @@ Go rewrite of [gitgres](../gitgres/): store Git objects and refs in PostgreSQL. 
 
 ```bash
 make build
-# or
-go build -o gitgres-backend ./cmd/backend
-go build -o git-remote-gitgres ./cmd/remote-helper
+# Produces gitgres-backend; git-remote-gitgres is a symlink to it.
+# Or: go build -o gitgres-backend ./cmd/backend
 ```
 
 ## Usage
 
-Same as the C gitgres backend:
+One binary for both CLI and Git remote-helper. Same as the C gitgres backend:
 
 ```bash
-# Create repo in DB (schema must be applied via gitgres: make -C ../gitgres createdb)
+# CLI (schema must be applied via gitgres: make -C ../gitgres createdb)
 ./gitgres-backend init "dbname=gitgres_test" myrepo
 ./gitgres-backend push "dbname=gitgres_test" myrepo /path/to/repo
 ./gitgres-backend clone "dbname=gitgres_test" myrepo /path/to/dest
 ./gitgres-backend ls-refs "dbname=gitgres_test" myrepo
 ```
 
-Remote helper (for `git push` / `git clone`):
+Remote helper: install the binary as `git-remote-gitgres` in PATH (make build creates a symlink). Then:
 
 ```bash
 git remote add pg gitgres::dbname=gitgres_test/myrepo

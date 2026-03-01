@@ -48,49 +48,74 @@ func ListRefs(ctx context.Context, s *storer.PostgresStorer) ([]RefLine, error) 
 }
 
 // CopyObjectsFromRepoToStorer copies all objects from a local repo into the Postgres storer.
-func CopyObjectsFromRepoToStorer(repo *git.Repository, pgStorer *storer.PostgresStorer) error {
+// Returns the number of objects copied.
+func CopyObjectsFromRepoToStorer(repo *git.Repository, pgStorer *storer.PostgresStorer) (int, error) {
 	iter, err := repo.Storer.IterEncodedObjects(plumbing.AnyObject)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer iter.Close()
-	return iter.ForEach(func(obj plumbing.EncodedObject) error {
+	n := 0
+	err = iter.ForEach(func(obj plumbing.EncodedObject) error {
 		_, err := pgStorer.SetEncodedObject(obj)
-		return err
+		if err != nil {
+			return err
+		}
+		n++
+		return nil
 	})
+	return n, err
 }
 
 // CopyRefsFromRepoToStorer copies all refs from a local repo into the Postgres storer.
-func CopyRefsFromRepoToStorer(repo *git.Repository, pgStorer *storer.PostgresStorer) error {
+// Returns the number of refs copied.
+func CopyRefsFromRepoToStorer(repo *git.Repository, pgStorer *storer.PostgresStorer) (int, error) {
 	iter, err := repo.Storer.IterReferences()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer iter.Close()
-	return iter.ForEach(func(ref *plumbing.Reference) error {
-		return pgStorer.SetReference(ref)
+	n := 0
+	err = iter.ForEach(func(ref *plumbing.Reference) error {
+		if err := pgStorer.SetReference(ref); err != nil {
+			return err
+		}
+		n++
+		return nil
 	})
+	return n, err
 }
 
 // CopyFromStorerToRepo copies all objects and refs from the Postgres storer into the repo.
-func CopyFromStorerToRepo(ctx context.Context, pgStorer *storer.PostgresStorer, repo *git.Repository) error {
+// Returns (objectCount, refCount, error).
+func CopyFromStorerToRepo(ctx context.Context, pgStorer *storer.PostgresStorer, repo *git.Repository) (objN, refN int, err error) {
 	iter, err := pgStorer.IterEncodedObjects(plumbing.AnyObject)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	defer iter.Close()
-	if err := iter.ForEach(func(obj plumbing.EncodedObject) error {
-		_, err := repo.Storer.SetEncodedObject(obj)
-		return err
-	}); err != nil {
-		return err
+	err = iter.ForEach(func(obj plumbing.EncodedObject) error {
+		_, e := repo.Storer.SetEncodedObject(obj)
+		if e != nil {
+			return e
+		}
+		objN++
+		return nil
+	})
+	if err != nil {
+		return 0, 0, err
 	}
 	refIter, err := pgStorer.IterReferences()
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	defer refIter.Close()
-	return refIter.ForEach(func(ref *plumbing.Reference) error {
-		return repo.Storer.SetReference(ref)
+	err = refIter.ForEach(func(ref *plumbing.Reference) error {
+		if e := repo.Storer.SetReference(ref); e != nil {
+			return e
+		}
+		refN++
+		return nil
 	})
+	return objN, refN, err
 }

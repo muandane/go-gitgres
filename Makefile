@@ -4,7 +4,7 @@ all: build
 
 build:
 	go build -o gitgres-backend ./cmd/backend
-	go build -o git-remote-gitgres ./cmd/remote-helper
+	ln -sf gitgres-backend git-remote-gitgres
 
 sqlc:
 	sqlc generate

@@ -107,21 +107,15 @@ func runPush(ctx context.Context, conninfo, reponame, localPath string) {
 	if err != nil {
 		die("open local repo: %v", err)
 	}
-	if err := backend.CopyObjectsFromRepoToStorer(repo, pgStorer); err != nil {
+	objCount, err := backend.CopyObjectsFromRepoToStorer(repo, pgStorer)
+	if err != nil {
 		die("copy objects: %v", err)
 	}
-	objCount, _ := repo.Storer.IterEncodedObjects(plumbing.AnyObject)
-	n := 0
-	objCount.ForEach(func(plumbing.EncodedObject) error { n++; return nil })
-	objCount.Close()
-	if err := backend.CopyRefsFromRepoToStorer(repo, pgStorer); err != nil {
+	refCount, err := backend.CopyRefsFromRepoToStorer(repo, pgStorer)
+	if err != nil {
 		die("copy refs: %v", err)
 	}
-	refIter, _ := repo.Storer.IterReferences()
-	refCount := 0
-	refIter.ForEach(func(*plumbing.Reference) error { refCount++; return nil })
-	refIter.Close()
-	fmt.Printf("Pushed %d objects\n", n)
+	fmt.Printf("Pushed %d objects\n", objCount)
 	fmt.Printf("Pushed %d refs\n", refCount)
 }
 
@@ -141,11 +135,12 @@ func runClone(ctx context.Context, conninfo, reponame, destPath string) {
 	if err != nil {
 		die("init local repo: %v", err)
 	}
-	if err := backend.CopyFromStorerToRepo(ctx, pgStorer, repo); err != nil {
+	objN, refN, err := backend.CopyFromStorerToRepo(ctx, pgStorer, repo)
+	if err != nil {
 		die("copy from storer: %v", err)
 	}
-	refs, _ := backend.ListRefs(ctx, pgStorer)
-	fmt.Printf("Cloned %d refs\n", len(refs))
+	fmt.Printf("Cloned %d objects\n", objN)
+	fmt.Printf("Cloned %d refs\n", refN)
 }
 
 func runLsRefs(ctx context.Context, conninfo, reponame string) {
@@ -260,7 +255,8 @@ func cmdFetch(ctx context.Context, pgStorer *storer.PostgresStorer, gitDir strin
 	if err != nil {
 		die("open local repo: %v", err)
 	}
-	if err := backend.CopyFromStorerToRepo(ctx, pgStorer, repo); err != nil {
+	_, _, err = backend.CopyFromStorerToRepo(ctx, pgStorer, repo)
+	if err != nil {
 		die("fetch: %v", err)
 	}
 	fmt.Println()
@@ -304,7 +300,7 @@ func cmdPush(ctx context.Context, pool *pgxpool.Pool, pgStorer *storer.PostgresS
 	if err != nil {
 		die("open local repo: %v", err)
 	}
-	if err := backend.CopyObjectsFromRepoToStorer(repo, pgStorer); err != nil {
+	if _, err := backend.CopyObjectsFromRepoToStorer(repo, pgStorer); err != nil {
 		die("iterate objects: %v", err)
 	}
 	q := db.New(pool)
