@@ -3,10 +3,17 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 
+	"github.com/anchore/grype/grype"
+	"github.com/anchore/grype/grype/db/v6/distribution"
+	"github.com/anchore/grype/grype/db/v6/installation"
+	"github.com/anchore/grype/grype/matcher"
+	"github.com/anchore/grype/grype/pkg"
+	"github.com/anchore/syft/syft"
 	"github.com/muandane/go-gitgres/pkg/clone"
 )
 
@@ -45,34 +52,71 @@ func main() {
 		os.Exit(1)
 	}
 	defer cleanup()
-	log.Info("cloned; running Syft", "dir", dir)
 
-	syftCmd := exec.CommandContext(ctx, "syft", "dir:"+dir, "-o", "cyclonedx-json")
-	syftOut, err := syftCmd.Output()
+	// Catalog with Syft (library)
+	log.Info("cataloging with Syft", "dir", dir)
+	source, err := syft.GetSource(ctx, "dir:"+dir, syft.DefaultGetSourceConfig())
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Stderr.Write(exitErr.Stderr)
-			os.Exit(exitErr.ExitCode())
-		}
-		log.Error("syft failed", "err", err)
+		log.Error("syft get source failed", "err", err)
+		os.Exit(1)
+	}
+	_, err = syft.CreateSBOM(ctx, source, syft.DefaultCreateSBOMConfig())
+	if err != nil {
+		log.Error("syft create SBOM failed", "err", err)
+		os.Exit(1)
+	}
+	log.Info("SBOM created")
+
+	// Load Grype vulnerability DB (uses temp dir; first run may download over network)
+	dbRoot, err := os.MkdirTemp("", "grype-db-*")
+	if err != nil {
+		log.Error("create grype db dir failed", "err", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(dbRoot)
+
+	distCfg := distribution.DefaultConfig()
+	installCfg := installation.Config{
+		DBRootDir:        dbRoot,
+		ValidateChecksum: false,
+		ValidateAge:      false,
+	}
+	store, status, err := grype.LoadVulnerabilityDB(distCfg, installCfg, true)
+	if err != nil {
+		log.Error("load vulnerability DB failed", "err", err)
+		os.Exit(1)
+	}
+	if c, ok := store.(io.Closer); ok {
+		defer c.Close()
+	}
+	log.Info("vulnerability DB loaded", "path", status.Path)
+
+	// Get packages from dir (Grype uses Syft internally for dir: input)
+	packages, pkgContext, _, err := pkg.Provide("dir:"+dir, pkg.ProviderConfig{})
+	if err != nil {
+		log.Error("grype provide packages failed", "err", err)
 		os.Exit(1)
 	}
 
-	sbomFile := dir + "/sbom.cyclonedx.json"
-	if err := os.WriteFile(sbomFile, syftOut, 0o644); err != nil {
-		log.Error("write sbom failed", "err", err)
+	// Match vulnerabilities
+	matchers := matcher.NewDefaultMatchers(matcher.Config{})
+	vm := grype.VulnerabilityMatcher{VulnerabilityProvider: store, Matchers: matchers}
+	remainingMatches, _, err := vm.FindMatchesContext(ctx, packages, pkgContext)
+	if err != nil {
+		log.Error("find matches failed", "err", err)
 		os.Exit(1)
 	}
-	log.Info("SBOM written; running Grype")
 
-	grypeCmd := exec.CommandContext(ctx, "grype", "sbom:"+sbomFile)
-	grypeCmd.Stdout = os.Stdout
-	grypeCmd.Stderr = os.Stderr
-	if err := grypeCmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
+	// Print results (table-style)
+	fmt.Fprintln(os.Stdout, "\nVulnerability matches:")
+	fmt.Fprintf(os.Stdout, "%-20s %-12s %s\n", "ID", "SEVERITY", "PACKAGE")
+	fmt.Fprintln(os.Stdout, "-------------------- ------------ --------")
+	for _, m := range remainingMatches.Sorted() {
+		sev := "unknown"
+		if m.Vulnerability.Metadata != nil {
+			sev = m.Vulnerability.Metadata.Severity
 		}
-		log.Error("grype failed", "err", err)
-		os.Exit(1)
+		fmt.Fprintf(os.Stdout, "%-20s %-12s %s\n", m.Vulnerability.ID, sev, m.Package.Name)
 	}
+	log.Info("scan complete", "matches", remainingMatches.Count())
 }
