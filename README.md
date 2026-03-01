@@ -1,28 +1,33 @@
 # go-gitgres
 
-Go rewrite of [gitgres](../gitgres/): store Git objects and refs in PostgreSQL. Uses [Go 1.26](https://go.dev/doc/go1.26), [go-git](https://github.com/go-git/go-git), [sqlc](https://sqlc.dev/), and [pgx](https://github.com/jackc/pgx). SQL is linted with [sqlfluff](https://docs.sqlfluff.org/).
+Store Git objects and refs in PostgreSQL. One binary acts as CLI and Git remote-helper.
+
+Uses Go 1.26, [go-git](https://github.com/go-git/go-git), [sqlc](https://sqlc.dev/), and [pgx](https://github.com/jackc/pgx).
 
 ## Build
 
 ```bash
 make build
-# Produces gitgres-backend; git-remote-gitgres is a symlink to it.
-# Or: go build -o gitgres-backend ./cmd/backend
 ```
+
+Produces `gitgres-backend` and a `git-remote-gitgres` symlink. Or: `go build -o gitgres-backend ./cmd/backend`.
 
 ## Usage
 
-One binary for both CLI and Git remote-helper. Same as the C gitgres backend:
+Apply the schema first (see parent [gitgres](../gitgres/) for `createdb`). Then:
+
+**CLI**
 
 ```bash
-# CLI (schema must be applied via gitgres: make -C ../gitgres createdb)
 ./gitgres-backend init "dbname=gitgres_test" myrepo
 ./gitgres-backend push "dbname=gitgres_test" myrepo /path/to/repo
 ./gitgres-backend clone "dbname=gitgres_test" myrepo /path/to/dest
 ./gitgres-backend ls-refs "dbname=gitgres_test" myrepo
 ```
 
-Remote helper: install the binary as `git-remote-gitgres` in PATH (make build creates a symlink). Then:
+**Remote helper**
+
+Install the binary as `git-remote-gitgres` in PATH. Then:
 
 ```bash
 git remote add pg gitgres::dbname=gitgres_test/myrepo
@@ -32,26 +37,28 @@ git clone gitgres::dbname=gitgres_test/myrepo /path/to/clone
 
 ## Tests
 
-Pure Go test suite. No Ruby.
-
 ```bash
 make test
 # or
 go test ./...
+```
 
-# Coverage: DB tests skip when no Postgres; low %% is expected without a DB
+DB tests skip when Postgres is unavailable. For coverage:
+
+```bash
 make test-coverage
-# HTML report: go tool cover -html=coverage.out
+# HTML: go tool cover -html=coverage.out
+```
 
-# Full coverage: run DB tests against Postgres in Docker (requires Docker)
+For full coverage including DB-backed code (uses testcontainers; requires Docker):
+
+```bash
 make test-integration
 ```
 
-Tests that hit the DB skip when Postgres is unavailable. So `make test-coverage` without a DB reports only unit-test coverage (low percentage); use `make test-integration` for coverage that includes all DB-backed code. For full coverage without a pre-created DB, run `make test-integration` (uses testcontainers; requires Docker). With a running DB and schema applied (`make -C ../gitgres createdb` once), `make test` runs the same tests against `gitgres_test`.
-
 ## Library
 
-Import the storer to use Git-over-Postgres from Go. Package docs: `go doc go-gitgres/internal/db`, `go doc go-gitgres/internal/storer`, `go doc go-gitgres/internal/backend`.
+Use the storer from Go. See `go doc go-gitgres/internal/db`, `go doc go-gitgres/internal/storer`, `go doc go-gitgres/internal/backend`.
 
 ```go
 import "go-gitgres/internal/db"
@@ -59,14 +66,14 @@ import "go-gitgres/internal/storer"
 
 pool, _ := db.OpenPool(ctx, "dbname=gitgres_test")
 s, _ := storer.NewPostgresStorer(ctx, pool, "my-repo")
-// s implements storage.Storer; use with go-git
+// s implements storage.Storer for go-git
 ```
 
-## SQL codegen and lint
+## SQL
 
-Schema and queries are in `sql/`. Generate Go and lint SQL:
+Schema and queries live in `sql/`. Generate Go and lint:
 
 ```bash
-make sqlc        # sqlc generate
-make lint-sql    # sqlfluff lint sql/ (requires: pip install sqlfluff)
+make sqlc       # sqlc generate
+make lint-sql   # sqlfluff lint sql/ (pip install sqlfluff)
 ```
