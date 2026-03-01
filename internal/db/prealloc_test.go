@@ -53,7 +53,7 @@ func TestListRefsPreallocMatchesListRefs(t *testing.T) {
 	for i := range oid {
 		oid[i] = 0x01
 	}
-	if err := q.RefUpdate(ctx, RefUpdateParams{RepoID: repoID, Name: "refs/heads/main", NewOid: oid, OldOid: nil, Force: true}); err != nil {
+	if _, err := q.RefUpdate(ctx, RefUpdateParams{RepoID: repoID, Name: "refs/heads/main", NewOid: oid, OldOid: nil, Force: true}); err != nil {
 		t.Fatalf("RefUpdate: %v", err)
 	}
 	got, err = q.ListRefsPrealloc(ctx, repoID)
@@ -74,7 +74,7 @@ func TestListRefsPreallocMatchesListRefs(t *testing.T) {
 	for i := range oid2 {
 		oid2[i] = 0x02
 	}
-	if err := q.RefUpdate(ctx, RefUpdateParams{RepoID: repoID, Name: "refs/heads/other", NewOid: oid2, OldOid: nil, Force: true}); err != nil {
+	if _, err := q.RefUpdate(ctx, RefUpdateParams{RepoID: repoID, Name: "refs/heads/other", NewOid: oid2, OldOid: nil, Force: true}); err != nil {
 		t.Fatalf("RefUpdate other: %v", err)
 	}
 	got, err = q.ListRefsPrealloc(ctx, repoID)

@@ -213,7 +213,7 @@ func (s *PostgresStorer) IterReferences() (storer.ReferenceIter, error) {
 	return storer.NewReferenceSliceIter(list), nil
 }
 
-var zeroOid20 [20]byte // package-level to avoid per-call allocation in RemoveReference
+var zeroOid20 [20]byte
 
 func (s *PostgresStorer) RemoveReference(n plumbing.ReferenceName) error {
 	okRes, err := s.q.RefUpdate(s.ctx, db.RefUpdateParams{
@@ -228,16 +228,15 @@ func (s *PostgresStorer) RemoveReference(n plumbing.ReferenceName) error {
 	return nil
 }
 
-// RefRow is one ref row from the DB (name, oid, optional symbolic target).
-// Used by callers that need a single query and pre-allocated slice.
+// RefRow is one ref row from the DB: name, oid (20 bytes for hash refs), and optional symbolic target.
 type RefRow struct {
-	Name          string
-	Oid           []byte
-	Symbolic      string
-	SymbolicValid bool
+	Name          string // ref name
+	Oid           []byte // 20-byte object ID for hash refs
+	Symbolic      string // target ref name when SymbolicValid is true
+	SymbolicValid bool   // true if this ref is symbolic
 }
 
-// ListRefsRows returns refs from the DB for this repo.
+// ListRefsRows returns all refs for this repo as RefRow slices.
 func (s *PostgresStorer) ListRefsRows() ([]RefRow, error) {
 	rows, err := s.q.ListRefsPrealloc(s.ctx, s.repoID)
 	if err != nil {

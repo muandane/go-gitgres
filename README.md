@@ -51,7 +51,7 @@ Tests that hit the DB skip when Postgres is unavailable. So `make test-coverage`
 
 ## Library
 
-Import the storer to use Git-over-Postgres from Go:
+Import the storer to use Git-over-Postgres from Go. Package docs: `go doc go-gitgres/internal/db`, `go doc go-gitgres/internal/storer`, `go doc go-gitgres/internal/backend`.
 
 ```go
 import "go-gitgres/internal/db"

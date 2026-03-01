@@ -1,4 +1,6 @@
-// Package backend provides shared logic for the gitgres CLI and remote-helper protocol.
+// Package backend provides shared logic for the gitgres CLI and remote-helper:
+// URL parsing (ParseURL), ref listing (ListRefs), and copying objects/refs between
+// a local go-git repo and a Postgres storer (CopyObjectsFromRepoToStorer, etc.).
 package backend
 
 import (
@@ -21,15 +23,15 @@ func ParseURL(url string) (conninfo, reponame string, err error) {
 	return url[:i], url[i+1:], nil
 }
 
-// RefLine is one ref for listing (hash or symbolic).
+// RefLine is one ref for listing. For hash refs, Hash is set and Symbolic is empty;
+// for symbolic refs, Symbolic is the target name and Hash is empty. Name is always set.
 type RefLine struct {
-	Hash     string
-	Name     string
-	Symbolic string
+	Hash     string // object ID for hash refs
+	Name     string // ref name, e.g. refs/heads/main
+	Symbolic string // target ref name for symbolic refs
 }
 
-// ListRefs returns all refs from the storer for the caller to format/print.
-// Uses a single DB call and pre-allocates the result slice.
+// ListRefs returns all refs from the storer for the caller to format or print.
 func ListRefs(ctx context.Context, s *storer.PostgresStorer) ([]RefLine, error) {
 	rows, err := s.ListRefsRows()
 	if err != nil {
