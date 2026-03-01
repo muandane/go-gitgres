@@ -55,7 +55,7 @@ func main() {
 
 	// Catalog with Syft (library)
 	log.Info("cataloging with Syft", "dir", dir)
-	source, err := syft.GetSource(ctx, "dir:"+dir, syft.DefaultGetSourceConfig())
+	source, err := syft.GetSource(ctx, dir, syft.DefaultGetSourceConfig().WithSources("local-directory"))
 	if err != nil {
 		log.Error("syft get source failed", "err", err)
 		os.Exit(1)
@@ -92,7 +92,9 @@ func main() {
 	log.Info("vulnerability DB loaded", "path", status.Path)
 
 	// Get packages from dir (Grype uses Syft internally for dir: input)
-	packages, pkgContext, _, err := pkg.Provide("dir:"+dir, pkg.ProviderConfig{})
+	packages, pkgContext, _, err := pkg.Provide("dir:"+dir, pkg.ProviderConfig{
+		SyftProviderConfig: pkg.SyftProviderConfig{SBOMOptions: syft.DefaultCreateSBOMConfig()},
+	})
 	if err != nil {
 		log.Error("grype provide packages failed", "err", err)
 		os.Exit(1)
