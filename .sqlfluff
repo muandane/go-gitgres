@@ -1,0 +1,9 @@
+[sqlfluff]
+dialect = postgres
+templater = raw
+sql_file_exts = .sql
+max_line_length = 120
+exclude_rules = layout.spacing, layout.keyword_newline, layout.select_targets, references.keywords
+
+[sqlfluff:indentation]
+indented_joins = False
