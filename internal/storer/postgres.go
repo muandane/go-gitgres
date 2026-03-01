@@ -92,7 +92,7 @@ func (s *PostgresStorer) EncodedObject(t plumbing.ObjectType, h plumbing.Hash) (
 }
 
 func (s *PostgresStorer) IterEncodedObjects(t plumbing.ObjectType) (storer.EncodedObjectIter, error) {
-	oids, err := s.q.ListObjectOids(s.ctx, s.repoID)
+	oids, err := s.q.ListObjectOidsPrealloc(s.ctx, s.repoID)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func (s *PostgresStorer) CheckAndSetReference(new, old *plumbing.Reference) erro
 }
 
 func (s *PostgresStorer) Reference(n plumbing.ReferenceName) (*plumbing.Reference, error) {
-	refs, err := s.q.ListRefs(s.ctx, s.repoID)
+	refs, err := s.q.ListRefsPrealloc(s.ctx, s.repoID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (s *PostgresStorer) Reference(n plumbing.ReferenceName) (*plumbing.Referenc
 }
 
 func (s *PostgresStorer) IterReferences() (storer.ReferenceIter, error) {
-	refs, err := s.q.ListRefs(s.ctx, s.repoID)
+	refs, err := s.q.ListRefsPrealloc(s.ctx, s.repoID)
 	if err != nil {
 		return nil, err
 	}
@@ -213,10 +213,11 @@ func (s *PostgresStorer) IterReferences() (storer.ReferenceIter, error) {
 	return storer.NewReferenceSliceIter(list), nil
 }
 
+var zeroOid20 [20]byte // package-level to avoid per-call allocation in RemoveReference
+
 func (s *PostgresStorer) RemoveReference(n plumbing.ReferenceName) error {
-	zeroOid := make([]byte, 20)
 	okRes, err := s.q.RefUpdate(s.ctx, db.RefUpdateParams{
-		RepoID: s.repoID, Name: string(n), NewOid: zeroOid, OldOid: nil, Force: true,
+		RepoID: s.repoID, Name: string(n), NewOid: zeroOid20[:], OldOid: nil, Force: true,
 	})
 	if err != nil {
 		return err
@@ -227,8 +228,35 @@ func (s *PostgresStorer) RemoveReference(n plumbing.ReferenceName) error {
 	return nil
 }
 
+// RefRow is one ref row from the DB (name, oid, optional symbolic target).
+// Used by callers that need a single query and pre-allocated slice.
+type RefRow struct {
+	Name          string
+	Oid           []byte
+	Symbolic      string
+	SymbolicValid bool
+}
+
+// ListRefsRows returns refs from the DB for this repo.
+func (s *PostgresStorer) ListRefsRows() ([]RefRow, error) {
+	rows, err := s.q.ListRefsPrealloc(s.ctx, s.repoID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]RefRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, RefRow{
+			Name:          r.Name,
+			Oid:           r.Oid,
+			Symbolic:      r.Symbolic.String,
+			SymbolicValid: r.Symbolic.Valid,
+		})
+	}
+	return out, nil
+}
+
 func (s *PostgresStorer) CountLooseRefs() (int, error) {
-	refs, err := s.q.ListRefs(s.ctx, s.repoID)
+	refs, err := s.q.ListRefsPrealloc(s.ctx, s.repoID)
 	return len(refs), err
 }
 

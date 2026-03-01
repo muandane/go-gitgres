@@ -285,6 +285,9 @@ func parsePushLine(line string) (specs []pushSpec) {
 }
 
 func readPushLines(scanner *bufio.Scanner, specs *[]pushSpec) {
+	if *specs == nil {
+		*specs = make([]pushSpec, 0, 16)
+	}
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.TrimSpace(line) == "" {

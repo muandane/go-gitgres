@@ -41,6 +41,17 @@ func (q *Queries) ListRefs(ctx context.Context, repoID int32) ([]ListRefsRow, er
 	return items, nil
 }
 
+const listRefsCount = `-- name: ListRefsCount :one
+SELECT count(*)::int FROM refs WHERE repo_id = $1
+`
+
+func (q *Queries) ListRefsCount(ctx context.Context, repoID int32) (int32, error) {
+	row := q.db.QueryRow(ctx, listRefsCount, repoID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const refDelete = `-- name: RefDelete :exec
 DELETE FROM refs WHERE repo_id = $1 AND name = $2
 `

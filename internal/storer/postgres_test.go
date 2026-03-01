@@ -176,7 +176,12 @@ func TestPostgresStorer_IterReferences_RemoveReference_CheckAndSetReference_Symb
 	if err := s.CheckAndSetReference(mainRef, nil); err != nil {
 		t.Errorf("CheckAndSetReference(main, nil): %v", err)
 	}
-	wrongOld := plumbing.NewHashReference("refs/heads/main", plumbing.ZeroHash)
+	// Use a non-zero wrong hash: git_ref_update treats zero old_oid as "no CAS" and succeeds.
+	var wrongHash plumbing.Hash
+	for i := range wrongHash {
+		wrongHash[i] = 0x11
+	}
+	wrongOld := plumbing.NewHashReference("refs/heads/main", wrongHash)
 	if err := s.CheckAndSetReference(mainRef, wrongOld); err != storage.ErrReferenceHasChanged {
 		t.Errorf("CheckAndSetReference with wrong old: want ErrReferenceHasChanged, got %v", err)
 	}

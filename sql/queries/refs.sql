@@ -10,6 +10,9 @@ SELECT git_ref_update(
 -- name: RefSetSymbolic :exec
 SELECT git_ref_set_symbolic(sqlc.arg(repo_id)::integer, sqlc.arg(name)::text, sqlc.arg(target)::text);
 
+-- name: ListRefsCount :one
+SELECT count(*)::int FROM refs WHERE repo_id = $1;
+
 -- name: ListRefs :many
 SELECT name, oid, symbolic FROM refs WHERE repo_id = $1 ORDER BY name;
 

@@ -29,22 +29,23 @@ type RefLine struct {
 }
 
 // ListRefs returns all refs from the storer for the caller to format/print.
+// Uses a single DB call and pre-allocates the result slice.
 func ListRefs(ctx context.Context, s *storer.PostgresStorer) ([]RefLine, error) {
-	iter, err := s.IterReferences()
+	rows, err := s.ListRefsRows()
 	if err != nil {
 		return nil, err
 	}
-	defer iter.Close()
-	var out []RefLine
-	err = iter.ForEach(func(ref *plumbing.Reference) error {
-		if ref.Type() == plumbing.HashReference {
-			out = append(out, RefLine{Hash: ref.Hash().String(), Name: string(ref.Name())})
-		} else {
-			out = append(out, RefLine{Symbolic: string(ref.Target()), Name: string(ref.Name())})
+	out := make([]RefLine, 0, len(rows))
+	for _, r := range rows {
+		if len(r.Oid) == 20 {
+			var h plumbing.Hash
+			copy(h[:], r.Oid)
+			out = append(out, RefLine{Hash: h.String(), Name: r.Name})
+		} else if r.SymbolicValid {
+			out = append(out, RefLine{Symbolic: r.Symbolic, Name: r.Name})
 		}
-		return nil
-	})
-	return out, err
+	}
+	return out, nil
 }
 
 // CopyObjectsFromRepoToStorer copies all objects from a local repo into the Postgres storer.

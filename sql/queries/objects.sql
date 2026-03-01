@@ -4,5 +4,8 @@ SELECT git_object_write(sqlc.arg(repo_id)::integer, sqlc.arg(obj_type)::smallint
 -- name: ObjectRead :one
 SELECT type, size, content FROM objects WHERE repo_id = $1 AND oid = $2;
 
+-- name: ListObjectOidsCount :one
+SELECT count(*)::int FROM objects WHERE repo_id = $1;
+
 -- name: ListObjectOids :many
 SELECT oid FROM objects WHERE repo_id = $1;

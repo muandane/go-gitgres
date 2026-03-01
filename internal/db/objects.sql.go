@@ -33,6 +33,17 @@ func (q *Queries) ListObjectOids(ctx context.Context, repoID int32) ([][]byte, e
 	return items, nil
 }
 
+const listObjectOidsCount = `-- name: ListObjectOidsCount :one
+SELECT count(*)::int FROM objects WHERE repo_id = $1
+`
+
+func (q *Queries) ListObjectOidsCount(ctx context.Context, repoID int32) (int32, error) {
+	row := q.db.QueryRow(ctx, listObjectOidsCount, repoID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const objectRead = `-- name: ObjectRead :one
 SELECT type, size, content FROM objects WHERE repo_id = $1 AND oid = $2
 `
