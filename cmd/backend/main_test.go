@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -14,6 +15,117 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
+
+// exitSentinel is the value panic'd by tests when die would have called os.Exit(1).
+type exitSentinel int
+
+func TestRunCLI_NoArgs(t *testing.T) {
+	oldArgs := os.Args
+	oldExit := exitFunc
+	oldStderr := os.Stderr
+	defer func() { os.Args = oldArgs; exitFunc = oldExit; os.Stderr = oldStderr }()
+
+	os.Args = []string{"gitgres-backend"}
+	exitFunc = func(int) { panic(exitSentinel(1)) }
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	var gotPanic bool
+	func() {
+		defer func() {
+			if v := recover(); v != nil {
+				if _, ok := v.(exitSentinel); ok {
+					gotPanic = true
+				} else {
+					panic(v)
+				}
+			}
+		}()
+		runCLI()
+	}()
+	w.Close()
+	var stderr bytes.Buffer
+	stderr.ReadFrom(r)
+	if !gotPanic {
+		t.Fatal("runCLI did not exit (panic)")
+	}
+	want := "fatal: usage: gitgres-backend init|push|clone|ls-refs [args...]"
+	if got := strings.TrimSpace(stderr.String()); got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
+	}
+}
+
+func TestRunCLI_UnknownCommand(t *testing.T) {
+	oldArgs := os.Args
+	oldExit := exitFunc
+	oldStderr := os.Stderr
+	defer func() { os.Args = oldArgs; exitFunc = oldExit; os.Stderr = oldStderr }()
+
+	os.Args = []string{"gitgres-backend", "unknown"}
+	exitFunc = func(int) { panic(exitSentinel(1)) }
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	var gotPanic bool
+	func() {
+		defer func() {
+			if v := recover(); v != nil {
+				if _, ok := v.(exitSentinel); ok {
+					gotPanic = true
+				} else {
+					panic(v)
+				}
+			}
+		}()
+		runCLI()
+	}()
+	w.Close()
+	var stderr bytes.Buffer
+	stderr.ReadFrom(r)
+	if !gotPanic {
+		t.Fatal("runCLI did not exit (panic)")
+	}
+	want := "fatal: unknown command: unknown"
+	if got := strings.TrimSpace(stderr.String()); got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
+	}
+}
+
+func TestRunCLI_InitTooFewArgs(t *testing.T) {
+	oldArgs := os.Args
+	oldExit := exitFunc
+	oldStderr := os.Stderr
+	defer func() { os.Args = oldArgs; exitFunc = oldExit; os.Stderr = oldStderr }()
+
+	os.Args = []string{"gitgres-backend", "init", "conn"}
+	exitFunc = func(int) { panic(exitSentinel(1)) }
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	var gotPanic bool
+	func() {
+		defer func() {
+			if v := recover(); v != nil {
+				if _, ok := v.(exitSentinel); ok {
+					gotPanic = true
+				} else {
+					panic(v)
+				}
+			}
+		}()
+		runCLI()
+	}()
+	w.Close()
+	var stderr bytes.Buffer
+	stderr.ReadFrom(r)
+	if !gotPanic {
+		t.Fatal("runCLI did not exit (panic)")
+	}
+	want := "fatal: usage: gitgres-backend init <conninfo> <reponame>"
+	if got := strings.TrimSpace(stderr.String()); got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
+	}
+}
 
 func connStr(t *testing.T) string {
 	t.Helper()
@@ -176,5 +288,23 @@ func TestReadPushLines(t *testing.T) {
 	}
 	if specs[1].src != "refs/heads/b" || specs[1].dst != "refs/heads/b" {
 		t.Errorf("specs[1] = %+v", specs[1])
+	}
+}
+
+func TestReadFetchLines(t *testing.T) {
+	input := "line1\nline2\n\nrest\nmore"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	readFetchLines(scanner)
+	if !scanner.Scan() {
+		t.Fatal("scanner should have next line after blank")
+	}
+	if got := scanner.Text(); got != "rest" {
+		t.Errorf("after readFetchLines: next line = %q, want %q", got, "rest")
+	}
+	if !scanner.Scan() {
+		t.Fatal("scanner should have one more line")
+	}
+	if got := scanner.Text(); got != "more" {
+		t.Errorf("next line = %q, want %q", got, "more")
 	}
 }

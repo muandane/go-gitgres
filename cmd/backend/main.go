@@ -31,9 +31,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// exitFunc is called by die; tests override it to panic instead of os.Exit.
+var exitFunc = os.Exit
+
 func die(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "fatal: "+format+"\n", args...)
-	os.Exit(1)
+	exitFunc(1)
 }
 
 func main() {
