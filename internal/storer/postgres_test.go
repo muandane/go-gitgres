@@ -63,6 +63,41 @@ func TestPostgresStorerRoundtrip(t *testing.T) {
 	if gotRef.Hash() != hash {
 		t.Errorf("ref hash: got %s", gotRef.Hash())
 	}
+
+	if id := s.RepoID(); id <= 0 {
+		t.Errorf("RepoID = %d, want positive", id)
+	}
+}
+
+func TestPostgresStorer_NewPostgresStorerWithID_RepoID(t *testing.T) {
+	ctx := context.Background()
+	pool, err := db.OpenPool(ctx, "")
+	if err != nil {
+		t.Skipf("no DB: %v", err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("DB unreachable: %v", err)
+	}
+
+	s1, err := NewPostgresStorer(ctx, pool, "go_storer_withid_test")
+	if err != nil {
+		t.Fatalf("NewPostgresStorer: %v", err)
+	}
+	repoID := s1.RepoID()
+	if repoID <= 0 {
+		t.Fatalf("RepoID = %d, want positive", repoID)
+	}
+
+	s2 := NewPostgresStorerWithID(ctx, pool, repoID)
+	if s2.RepoID() != repoID {
+		t.Errorf("NewPostgresStorerWithID RepoID = %d, want %d", s2.RepoID(), repoID)
+	}
+	refs, err := s2.IterReferences()
+	if err != nil {
+		t.Fatalf("IterReferences (storer from WithID): %v", err)
+	}
+	refs.Close()
 }
 
 func TestPostgresStorer_IterEncodedObjects_HasEncodedObject_EncodedObjectSize(t *testing.T) {

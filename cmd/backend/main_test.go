@@ -127,6 +127,111 @@ func TestRunCLI_InitTooFewArgs(t *testing.T) {
 	}
 }
 
+func TestRunCLI_PushTooFewArgs(t *testing.T) {
+	oldArgs := os.Args
+	oldExit := exitFunc
+	oldStderr := os.Stderr
+	defer func() { os.Args = oldArgs; exitFunc = oldExit; os.Stderr = oldStderr }()
+
+	os.Args = []string{"gitgres-backend", "push", "conn", "repo"}
+	exitFunc = func(int) { panic(exitSentinel(1)) }
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	var gotPanic bool
+	func() {
+		defer func() {
+			if v := recover(); v != nil {
+				if _, ok := v.(exitSentinel); ok {
+					gotPanic = true
+				} else {
+					panic(v)
+				}
+			}
+		}()
+		runCLI()
+	}()
+	w.Close()
+	var stderr bytes.Buffer
+	stderr.ReadFrom(r)
+	if !gotPanic {
+		t.Fatal("runCLI did not exit (panic)")
+	}
+	want := "fatal: usage: gitgres-backend push <conninfo> <reponame> <local-repo-path>"
+	if got := strings.TrimSpace(stderr.String()); got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
+	}
+}
+
+func TestRunCLI_CloneTooFewArgs(t *testing.T) {
+	oldArgs := os.Args
+	oldExit := exitFunc
+	oldStderr := os.Stderr
+	defer func() { os.Args = oldArgs; exitFunc = oldExit; os.Stderr = oldStderr }()
+
+	os.Args = []string{"gitgres-backend", "clone", "conn", "repo"}
+	exitFunc = func(int) { panic(exitSentinel(1)) }
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	var gotPanic bool
+	func() {
+		defer func() {
+			if v := recover(); v != nil {
+				if _, ok := v.(exitSentinel); ok {
+					gotPanic = true
+				} else {
+					panic(v)
+				}
+			}
+		}()
+		runCLI()
+	}()
+	w.Close()
+	var stderr bytes.Buffer
+	stderr.ReadFrom(r)
+	if !gotPanic {
+		t.Fatal("runCLI did not exit (panic)")
+	}
+	want := "fatal: usage: gitgres-backend clone <conninfo> <reponame> <dest-dir>"
+	if got := strings.TrimSpace(stderr.String()); got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
+	}
+}
+
+func TestRunCLI_LsRefsTooFewArgs(t *testing.T) {
+	oldArgs := os.Args
+	oldExit := exitFunc
+	oldStderr := os.Stderr
+	defer func() { os.Args = oldArgs; exitFunc = oldExit; os.Stderr = oldStderr }()
+
+	os.Args = []string{"gitgres-backend", "ls-refs", "conn"}
+	exitFunc = func(int) { panic(exitSentinel(1)) }
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	var gotPanic bool
+	func() {
+		defer func() {
+			if v := recover(); v != nil {
+				if _, ok := v.(exitSentinel); ok {
+					gotPanic = true
+				} else {
+					panic(v)
+				}
+			}
+		}()
+		runCLI()
+	}()
+	w.Close()
+	var stderr bytes.Buffer
+	stderr.ReadFrom(r)
+	if !gotPanic {
+		t.Fatal("runCLI did not exit (panic)")
+	}
+	want := "fatal: usage: gitgres-backend ls-refs <conninfo> <reponame>"
+	if got := strings.TrimSpace(stderr.String()); got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
+	}
+}
+
 func connStr(t *testing.T) string {
 	t.Helper()
 	s := os.Getenv("PGCONN")
