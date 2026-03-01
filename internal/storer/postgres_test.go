@@ -208,6 +208,14 @@ func TestPostgresStorer_IterReferences_RemoveReference_CheckAndSetReference_Symb
 		t.Errorf("IterReferences: got %v, want 2 refs", refNames)
 	}
 
+	rows, err := s.ListRefsRows()
+	if err != nil {
+		t.Fatalf("ListRefsRows: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Errorf("ListRefsRows: got %d rows, want 2", len(rows))
+	}
+
 	if err := s.CheckAndSetReference(mainRef, nil); err != nil {
 		t.Errorf("CheckAndSetReference(main, nil): %v", err)
 	}
@@ -227,5 +235,58 @@ func TestPostgresStorer_IterReferences_RemoveReference_CheckAndSetReference_Symb
 	_, err = s.Reference("refs/heads/main")
 	if err != plumbing.ErrReferenceNotFound {
 		t.Errorf("Reference after Remove: want ErrReferenceNotFound, got %v", err)
+	}
+}
+
+func TestPostgresStorer_StubMethods(t *testing.T) {
+	ctx := context.Background()
+	pool, err := db.OpenPool(ctx, "")
+	if err != nil {
+		t.Skipf("no DB: %v", err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("DB unreachable: %v", err)
+	}
+
+	s, err := NewPostgresStorer(ctx, pool, "go_storer_stub_test")
+	if err != nil {
+		t.Fatalf("NewPostgresStorer: %v", err)
+	}
+
+	if err := s.AddAlternate("x"); err != nil {
+		t.Errorf("AddAlternate: %v", err)
+	}
+	if err := s.PackRefs(); err != nil {
+		t.Errorf("PackRefs: %v", err)
+	}
+	if err := s.SetShallow(nil); err != nil {
+		t.Errorf("SetShallow: %v", err)
+	}
+	shallow, err := s.Shallow()
+	if err != nil || shallow != nil {
+		t.Errorf("Shallow: got %v, %v", shallow, err)
+	}
+	if err := s.SetIndex(nil); err != nil {
+		t.Errorf("SetIndex: %v", err)
+	}
+	idx, err := s.Index()
+	if err != nil || idx == nil || idx.Version != 2 {
+		t.Errorf("Index: got %v, %v", idx, err)
+	}
+	if err := s.SetConfig(nil); err != nil {
+		t.Errorf("SetConfig: %v", err)
+	}
+	cfg, err := s.Config()
+	if err != nil || cfg == nil {
+		t.Errorf("Config: got %v, %v", cfg, err)
+	}
+	st, err := s.Module("x")
+	if err != nil || st != nil {
+		t.Errorf("Module: got %v, %v", st, err)
+	}
+	n, err := s.CountLooseRefs()
+	if err != nil || n < 0 {
+		t.Errorf("CountLooseRefs: got %d, %v", n, err)
 	}
 }

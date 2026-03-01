@@ -392,3 +392,37 @@ func TestRefDeleteDirect(t *testing.T) {
 		}
 	}
 }
+
+func TestWithTx(t *testing.T) {
+	ctx := context.Background()
+	pool := OpenPoolForTest(ctx, t, "")
+	defer pool.Close()
+
+	q := New(pool)
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("Begin: %v", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qTx := q.WithTx(tx)
+	repoID, err := qTx.GetOrCreateRepo(ctx, "go_test_with_tx")
+	if err != nil {
+		t.Fatalf("GetOrCreateRepo in tx: %v", err)
+	}
+	if repoID <= 0 {
+		t.Error("GetOrCreateRepo in tx: repoID <= 0")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+
+	// Verify repo exists after commit
+	gotID, err := q.GetRepo(ctx, "go_test_with_tx")
+	if err != nil {
+		t.Fatalf("GetRepo after commit: %v", err)
+	}
+	if gotID != repoID {
+		t.Errorf("GetRepo id = %d, want %d", gotID, repoID)
+	}
+}
