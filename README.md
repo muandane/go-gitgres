@@ -39,12 +39,15 @@ make test
 # or
 go test ./...
 
-# Coverage
+# Coverage (DB tests skip when no Postgres)
 make test-coverage
 # HTML report: go tool cover -html=coverage.out
+
+# Near-100%% coverage: run DB tests against Postgres in Docker (requires Docker)
+make test-integration
 ```
 
-Tests that hit the DB skip when Postgres is unavailable. With a running DB and schema applied (`make -C ../gitgres createdb` once), the same tests run against `gitgres_test`.
+Tests that hit the DB skip when Postgres is unavailable. For full coverage without a pre-created DB, run `make test-integration` (uses testcontainers; requires Docker). With a running DB and schema applied (`make -C ../gitgres createdb` once), `make test` runs the same tests against `gitgres_test`.
 
 ## Library
 

@@ -1,4 +1,4 @@
-.PHONY: all build test test-coverage clean sqlc lint-sql
+.PHONY: all build test test-coverage test-integration clean sqlc lint-sql
 
 all: build
 
@@ -15,6 +15,11 @@ test:
 # Test coverage: writes coverage.out, prints summary. View HTML: go tool cover -html=coverage.out
 test-coverage:
 	go test -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -func=coverage.out
+
+# Near-100%% coverage: runs DB tests against Postgres in Docker (requires Docker). Same tests, no skip.
+test-integration:
+	go test -tags=integration -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -func=coverage.out
 
 # Lint SQL with sqlfluff (pip install sqlfluff).
