@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"strings"
 	"testing"
 )
 
@@ -54,5 +56,21 @@ func TestParsePushLine(t *testing.T) {
 				t.Errorf("parsePushLine(%q)[%d] = %+v, want %+v", tt.line, i, got[i], tt.want[i])
 			}
 		}
+	}
+}
+
+func TestReadPushLines(t *testing.T) {
+	input := "push refs/heads/a:refs/heads/a\npush refs/heads/b:refs/heads/b\n\n"
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	var specs []pushSpec
+	readPushLines(scanner, &specs)
+	if len(specs) != 2 {
+		t.Fatalf("readPushLines: got %d specs, want 2", len(specs))
+	}
+	if specs[0].src != "refs/heads/a" || specs[0].dst != "refs/heads/a" {
+		t.Errorf("specs[0] = %+v", specs[0])
+	}
+	if specs[1].src != "refs/heads/b" || specs[1].dst != "refs/heads/b" {
+		t.Errorf("specs[1] = %+v", specs[1])
 	}
 }
